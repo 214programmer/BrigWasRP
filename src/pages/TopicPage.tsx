@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { store, Post, Topic } from '../lib/store';
 import { useAuth, UserProfile } from '../contexts/AuthContext';
 import { Heart, Trash2 } from 'lucide-react';
+import { doc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const TopicPage: React.FC = () => {
   const { topicId } = useParams<{ topicId: string }>();
@@ -14,14 +16,33 @@ export const TopicPage: React.FC = () => {
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTopic = async () => {
-      if (topicId) {
-        setTopic((await store.getTopic(topicId)) || null);
-        setPosts(await store.getPosts(topicId));
-      }
+    let unsubscribeTopic: () => void;
+    let unsubscribePosts: () => void;
+
+    if (topicId) {
+      setLoading(true);
+      unsubscribeTopic = onSnapshot(doc(db, 'topics', topicId), (docSnap) => {
+        if (docSnap.exists()) {
+          setTopic(docSnap.data() as Topic);
+        } else {
+          setTopic(null);
+        }
+      });
+
+      const q = query(collection(db, 'posts'), where('topicId', '==', topicId));
+      unsubscribePosts = onSnapshot(q, (snapshot) => {
+        const p = snapshot.docs.map(d => d.data() as Post).sort((a, b) => a.createdAt - b.createdAt);
+        setPosts(p);
+        setLoading(false);
+      });
+    } else {
       setLoading(false);
+    }
+
+    return () => {
+      if (unsubscribeTopic) unsubscribeTopic();
+      if (unsubscribePosts) unsubscribePosts();
     };
-    fetchTopic();
   }, [topicId, user?.uid]);
 
   const handleReply = async (e: React.FormEvent) => {
@@ -84,7 +105,7 @@ export const TopicPage: React.FC = () => {
 
       <div className="space-y-4 mb-8">
         {posts.map((post, idx) => (
-          <div key={post.id} className="bg-bw-panel rounded-xl shadow-sm border border-bw-border flex flex-col md:flex-row overflow-hidden">
+          <div key={post.id || idx} className="bg-bw-panel rounded-xl shadow-sm border border-bw-border flex flex-col md:flex-row overflow-hidden">
             <div className="w-full md:w-[220px] bg-[#222225] p-5 border-b md:border-b-0 md:border-r border-bw-border flex flex-col items-center flex-shrink-0">
               <div className="w-16 h-16 bg-[#27272a] rounded-full mb-3 flex items-center justify-center text-white font-bold text-2xl border-2 border-[#3f3f46]">
                 {post.authorUsername?.[0]?.toUpperCase() || '?'}
