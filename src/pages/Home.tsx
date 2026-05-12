@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { store, Category, UserProfile } from '../lib/store';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { MessageSquare, FileText, User as UserIcon, Users, Trash2, Plus, X } from 'lucide-react';
@@ -28,28 +30,44 @@ export const Home: React.FC = () => {
   const [newCatType, setNewCatType] = useState('main');
 
   useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        const cats = await store.getCategories();
-        setCategories(cats);
+    let unsubscribeCats: () => void;
+    let unsubscribeUsers: () => void;
+    let unsubscribeTopics: () => void;
+    let unsubscribePosts: () => void;
 
-        const allUsers = await store.getUsers();
+    const setupListeners = () => {
+      setLoading(true);
+      unsubscribeCats = onSnapshot(collection(db, 'categories'), (snapshot) => {
+        const sortedCats = snapshot.docs.map(d => d.data() as Category).sort((a, b) => a.order - b.order);
+        setCategories(sortedCats);
+      });
+
+      unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        const allUsers = snapshot.docs.map(d => d.data() as UserProfile);
         const team = allUsers.filter(u => ['superadmin', 'deputy_superadmin', 'admin_1', 'admin_2', 'admin_3'].includes(u.role));
         setTeamMembers(team);
+        
+        setStats(prev => ({ ...prev, users: allUsers.length }));
+      });
 
-        const currentTopics = await store.getTopics();
-        const currentStats = await store.getStats();
+      unsubscribeTopics = onSnapshot(collection(db, 'topics'), (snapshot) => {
+        setStats(prev => ({ ...prev, topics: snapshot.size }));
+      });
 
-        setStats({
-          topics: currentStats.topics,
-          posts: currentStats.posts,
-          users: allUsers.length
-        });
-      } finally {
+      unsubscribePosts = onSnapshot(collection(db, 'posts'), (snapshot) => {
+        setStats(prev => ({ ...prev, posts: snapshot.size }));
         setLoading(false);
-      }
+      });
     };
-    fetchHomeData();
+
+    setupListeners();
+
+    return () => {
+      if (unsubscribeCats) unsubscribeCats();
+      if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeTopics) unsubscribeTopics();
+      if (unsubscribePosts) unsubscribePosts();
+    };
   }, []);
 
   const seedData = async () => {
@@ -133,8 +151,8 @@ export const Home: React.FC = () => {
           <h2 className="text-lg font-semibold text-white">{getTitleForType(type)}</h2>
         </div>
         <div className="bg-bw-panel rounded-b-xl shadow-sm divide-y divide-[#2a2a2a]">
-          {cats.map(cat => (
-            <div key={cat.id} className="p-5 hover:bg-[#222226] transition-colors flex items-center justify-between group">
+          {cats.map((cat, idx) => (
+            <div key={cat.id || idx} className="p-5 hover:bg-[#222226] transition-colors flex items-center justify-between group">
               <div className="flex items-start gap-4 flex-1">
                 <div className="mt-1 p-2.5 bg-[#2a1b1b] rounded-md border border-[#3f1d1d] group-hover:bg-[#382020] transition-colors shrink-0">
                   {getIconForType(type)}
@@ -216,7 +234,11 @@ export const Home: React.FC = () => {
         )}
 
         {/* Category List */}
-        {['main', 'faction', 'general'].map(type => renderSection(type))}
+        {['main', 'faction', 'general'].map(type => (
+          <React.Fragment key={type}>
+            {renderSection(type)}
+          </React.Fragment>
+        ))}
         
         {categories.length === 0 && profile?.role !== 'superadmin' && (
           <div className="text-center text-bw-muted py-12 bg-bw-panel rounded-xl border border-bw-border">
@@ -232,8 +254,8 @@ export const Home: React.FC = () => {
             <h3 className="font-semibold text-white">Команда проекта</h3>
           </div>
           <div className="p-5 flex flex-col gap-4">
-            {teamMembers.length > 0 ? teamMembers.map(member => (
-              <div key={member.id} className="flex items-center gap-4">
+            {teamMembers.length > 0 ? teamMembers.map((member, idx) => (
+              <div key={member.id || idx} className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-10 h-10 bg-[#27272a] rounded flex items-center justify-center text-gray-300 font-bold border border-[#3f3f46]">
                     {member.username?.[0]?.toUpperCase() || '?'}
