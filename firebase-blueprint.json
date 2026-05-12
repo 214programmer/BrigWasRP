@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Category definition",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["title", "description", "type", "order"]
+    },
+    "Topic": {
+      "title": "Topic",
+      "description": "Topic definition",
+      "type": "object",
+      "properties": {
+        "categoryId": { "type": "string" },
+        "title": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "views": { "type": "number" },
+        "repliesAmount": { "type": "number" },
+        "lastReplyAt": { "type": "number" }
+      },
+      "required": ["categoryId", "title", "authorId", "authorUsername", "createdAt", "views", "repliesAmount", "lastReplyAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Post definition",
+      "type": "object",
+      "properties": {
+        "topicId": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "likes": { "type": "array" }
+      },
+      "required": ["topicId", "content", "authorId", "authorUsername", "authorRole", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile definition",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string" },
+        "factionId": { "type": "string", "nullable": true }
+      },
+      "required": ["email", "username", "role"]
+    }
+  },
+  "firestore": {
+    "categories": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Categories collection"
+    },
+    "topics": {
+      "schema": { "$ref": "#/entities/Topic" },
+      "description": "Topics collection"
+    },
+    "posts": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Posts collection"
+    },
+    "users": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Users collection"
+    }
+  }
+}
