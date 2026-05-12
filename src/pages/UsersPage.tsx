@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { store } from '../lib/store';
 import { useAuth, UserProfile } from '../contexts/AuthContext';
 import { Shield, User, Star } from 'lucide-react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -21,13 +23,14 @@ export const UsersPage: React.FC = () => {
     { value: 'superadmin', label: 'Специальный Администратор / Founder' }
   ];
 
-  const fetchUsers = async () => {
-    setUsers(await store.getUsers());
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchUsers();
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const u = snapshot.docs.map(d => d.data() as UserProfile);
+      setUsers(u);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleRoleChange = async (userId: string) => {
@@ -109,8 +112,8 @@ export const UsersPage: React.FC = () => {
       </div>
 
       <div className="bg-bw-panel rounded-xl border border-bw-border shadow-sm overflow-hidden divide-y divide-[#2a2a2a]">
-        {users.map(u => (
-          <div key={u.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between hover:bg-[#222226] transition-colors gap-4">
+        {users.map((u, idx) => (
+          <div key={u.id || idx} className="p-5 flex flex-col md:flex-row md:items-center justify-between hover:bg-[#222226] transition-colors gap-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-[#27272a] rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-[#3f3f46]">
                 {u.username?.[0]?.toUpperCase() || '?'}
