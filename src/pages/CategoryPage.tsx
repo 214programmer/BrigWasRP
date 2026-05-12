@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { store, Topic, Category } from '../lib/store';
 import { useAuth } from '../contexts/AuthContext';
 import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { doc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const CategoryPage: React.FC = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -18,18 +20,34 @@ export const CategoryPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCategoryData = async () => {
-      if (categoryId) {
-        const c = await store.getCategory(categoryId);
-        if (c) {
+    let unsubscribeTopic: () => void;
+    let unsubscribeCategory: () => void;
+
+    if (categoryId) {
+      setLoading(true);
+
+      unsubscribeCategory = onSnapshot(doc(db, 'categories', categoryId), (docSnap) => {
+        if (docSnap.exists()) {
+          const c = docSnap.data() as Category;
           setCategoryName(c.title);
           setCatData(c);
         }
-        setTopics(await store.getTopics(categoryId));
-      }
+      });
+
+      const q = query(collection(db, 'topics'), where('categoryId', '==', categoryId));
+      unsubscribeTopic = onSnapshot(q, (snapshot) => {
+        const t = snapshot.docs.map(d => d.data() as Topic).sort((a, b) => b.lastReplyAt - a.lastReplyAt);
+        setTopics(t);
+        setLoading(false);
+      });
+    } else {
       setLoading(false);
+    }
+
+    return () => {
+      if (unsubscribeTopic) unsubscribeTopic();
+      if (unsubscribeCategory) unsubscribeCategory();
     };
-    fetchCategoryData();
   }, [categoryId]);
 
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
@@ -144,8 +162,8 @@ export const CategoryPage: React.FC = () => {
             В этом разделе пока нет тем.
           </div>
         ) : (
-          topics.map(topic => (
-            <div key={topic.id} className="p-5 hover:bg-[#222226] transition-colors flex items-center justify-between group">
+          topics.map((topic, idx) => (
+            <div key={topic.id || idx} className="p-5 hover:bg-[#222226] transition-colors flex items-center justify-between group">
               <div className="flex items-center flex-1">
                 <div className="bg-[#2a1b1b] p-3 rounded-full mr-5 text-bw-red border border-[#3f1d1d] group-hover:bg-[#382020] transition-colors shrink-0">
                   <MessageSquare className="w-5 h-5" />
